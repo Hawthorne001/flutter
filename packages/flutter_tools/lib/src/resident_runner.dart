@@ -1118,6 +1118,16 @@ abstract class ResidentRunner extends ResidentHandlers {
     return 'main.dart${swap ? '.swap' : ''}.dill';
   }
 
+  /// Whether the app being instrumented by the runner should be stopped during
+  /// cleanup.
+  ///
+  /// A detached app can happen one of two ways:
+  /// - [run] is used, and then the created application is manually [detach]ed;
+  /// - [attach] is used to explicitly connect to an already running app.
+  @protected
+  @visibleForTesting
+  bool stopAppDuringCleanup = true;
+
   bool get debuggingEnabled => debuggingOptions.debuggingEnabled;
 
   @override
@@ -1254,7 +1264,10 @@ abstract class ResidentRunner extends ResidentHandlers {
   }
 
   @override
+  @mustCallSuper
   Future<void> detach() async {
+    stopAppDuringCleanup = false;
+
     // TODO(bkonyi): remove when ready to serve DevTools from DDS.
     await residentDevtoolsHandler!.shutdown();
     await stopEchoingDeviceLog();
@@ -1398,6 +1411,7 @@ abstract class ResidentRunner extends ResidentHandlers {
     }
   }
 
+  @protected
   void appFinished() {
     if (_finished.isCompleted) {
       return;
@@ -1816,8 +1830,10 @@ class DebugConnectionInfo {
 /// Returns the next platform value for the switcher.
 ///
 /// These values must match what is available in
-/// `packages/flutter/lib/src/foundation/binding.dart`.
+/// `packages/flutter/lib/src/foundation/platform.dart`.
 String nextPlatform(String currentPlatform) {
+  // The following lines are read by a script, which expects a certain format.
+  // dart format off
   const List<String> platforms = <String>[
     'android',
     'iOS',
@@ -1826,6 +1842,7 @@ String nextPlatform(String currentPlatform) {
     'linux',
     'fuchsia',
   ];
+  // dart format on
   final int index = platforms.indexOf(currentPlatform);
   assert(index >= 0, 'unknown platform "$currentPlatform"');
   return platforms[(index + 1) % platforms.length];
